@@ -67,8 +67,7 @@ Lux proposes the usage of Linguistic Aspects as Features.
 
 # Place the data files on the correct directories
 
-    -- place data_wiki.csv inside data/
-    --
+    -- place dataset_wiki_clean.csv inside data/
 
 ## Known issues
 
