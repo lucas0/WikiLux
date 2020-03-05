@@ -1,15 +1,17 @@
-## Model for text classification regarding veracity.
+## Model for text classification using linguistic aspects as features.
 
 Baseline uses W2V embeddings trained on google corpus for fake news
 
 Lux proposes the usage of Linguistic Aspects as Features.
-# Lux
+# Wiki Lux
+
+Applying Lux to classify wikipedia pages as having a Point-of-View (POV) and as Solved POV (SPOV).
 
 ## INSTALLATION
 
 # This repository uses bert. in order to use BERT properly:
 
-1)Clone bert repo inside Lux/res:
+1)Clone bert repo inside WikiLux/res:
 
     -- git clone https://github.com/google-research/bert
 
@@ -25,9 +27,9 @@ Lux proposes the usage of Linguistic Aspects as Features.
 
 4)Set env variable BERT_BASE_DIR:
 
-    -- export BERT_BASE_DIR=/path/to/Lux/res/bert/uncased_L-12_H-768_A-12
+    -- export BERT_BASE_DIR=/path/to/WikiLux/res/bert/uncased_L-12_H-768_A-12
 
-   in our case: export BERT_BASE_DIR=~/Lux/res/bert/uncased_L-12_H-768_A-12
+   if you're in your user's directory: export BERT_BASE_DIR=~/WikiLux/res/bert/uncased_L-12_H-768_A-12
 
 # Install Specificity model
 
