@@ -83,10 +83,11 @@ def generate_specificity():
 
 #this process takes a while, so it should be done before the feature generation step
 def generate_complexity():
+    subprocess.call("find "+cwd+"/res/complexity/input_texts/ -maxdepth 1 -name \'*.txt\' -delete", shell=True, cwd=comp_dir)
     csv = pd.read_csv(data_dir+"/data.csv")
     print("Generating Complexity for dataset shaped: ",csv.shape)
-    subprocess.call("rm "+cwd+"/res/complexity/input_texts/*", shell=True, cwd=comp_dir)
     for index, row in csv.iterrows():
+        print(row)
         with open(cwd+"/res/complexity/input_texts/"+str(index)+".txt", "w+") as f:
             text = re.sub("\n|\r","",row['body'])
             f.write(text)
@@ -94,6 +95,7 @@ def generate_complexity():
     print("Complexity Scores Generated")
 
 def vectorize(text, text_id):
+    print(">>>",text_id,text)
     sentences = split_into_sentences(text)
     lower_case = text.lower()
     tokens = nltk.word_tokenize(lower_case)
