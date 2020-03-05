@@ -65,6 +65,11 @@ Lux proposes the usage of Linguistic Aspects as Features.
     -- wget -c "https://s3.amazonaws.com/dl4j-distribution/GoogleNews-vectors-negative300.bin.gz"
     -- gunzip GoogleNews-vectors-negative300.bin.gz
 
+# Download and extract YAGO ontology into res/complexity/vendor/dbpedia/yago_taxonomy.ttl
+
+    -- Download the .7z file from http://resources.mpi-inf.mpg.de/yago-naga/yago3.1/yago3.1_entire_ttl.7z
+    -- Extract following the instructions in https://www.thegeekstuff.com/2010/04/7z-7zip-7za-file-compression
+
 # Place the data files on the correct directories
 
     -- place dataset_wiki_clean.csv inside data/
