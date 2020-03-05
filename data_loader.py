@@ -22,7 +22,6 @@ cwd = os.path.abspath(filename+"/..")
 
 modelpath = cwd+"/w2vModel"
 data_dir = cwd+"/data"
-dataset_dir = data_dir+"/datasets"
 bert_dir = cwd+"/res/bert"
 hash_path = cwd+"/data/hash.txt"
 spec_dir = cwd+"/res/specificity/Domain-Agnostic-Sentence-Specificity-Prediction"
@@ -61,6 +60,7 @@ def pos(sentence):
 
 def save_p(filename, data):
     with open(filename, "wb") as p:
+    #pickle.dump(data, open(filename, 'wb'), protocol=4)
         pickle.dump(data, p)
 
 def read_p(filename):
@@ -107,33 +107,20 @@ def reset_hash():
 
 #run concat+normalize.py inside dataset/ before loading data
 def load_data(emb_type='w2v', collapse_classes=False, fold=None, num_folds=1, random_state=None, force_reload=False):
-    print('Loading data from',dataset_dir)
-    data = pd.read_csv(dataset_dir+"/dataset.csv", sep=',')
+    print('Loading data from',data_dir)
+    data = pd.read_csv(data_dir+"/dataset_wiki_clean.csv", sep=',')
 
     #if force_reload: reset_hash()
-
-    print("size of initial \"dataset\":",len(data))
-    data = data.drop_duplicates(subset='o_url', keep='first')
-    print("after dropping duplicates:",len(data))
-    data.o_body = data.o_body.astype('str')
-    data = data[data['o_body'].map(len) > 150]
-    print("after dropping origins with less than 150 chars:",len(data))
+    data = data[data['body'].apply(lambda x: isinstance(x, str))]
+    data = data[data['body'].map(len) > 1000]
     data = data.reset_index()
+    #data = data.sample(frac=0.01, random_state=random_state)
+    #data = data.sample(frac=0.005, random_state=random_state)
+    data = data.sample(frac=0.115, random_state=random_state+1)
     json_data = data.to_json().encode()
-    data = data.sample(frac=1, random_state=random_state)
     df_hash = hashlib.sha256(json_data).hexdigest()
 
-    labels = ['false', 'mfalse', 'mixture', 'mtrue', 'true', 'unverified']
-    if(collapse_classes):
-        data.loc[data['verdict'] == "mfalse", 'verdict'] = 'false'
-        data.loc[data['verdict'] == "mtrue", 'verdict'] = 'true'
-        labels = ['false', 'mixture', 'true', 'unverified']
-
-    print("considered labels:", data.verdict.unique())
-    labels = ['true', 'false']
-    data = data.loc[data.verdict.isin(labels)]
-    print("considered labels:", data.verdict.unique())
-    print("after dropping invalid labels:",len(data))
+    labels = ['SPOV', 'POV']
 
     labels_idx = [labels.index(label) for label in labels]
     labels_one_hot = np.eye(len(labels))[labels_idx]
@@ -152,8 +139,9 @@ def load_data(emb_type='w2v', collapse_classes=False, fold=None, num_folds=1, ra
     if not check_hash(df_hash, num_folds):
         print("Processing New Data...")
 
-        data = [(clean_text(pd.Series(e[1])['o_body']),pd.Series(e[1])['verdict'])for e in list(data.iterrows())]
-        df = pd.DataFrame(data, columns=["body","verdict"])
+        data = [(clean_text(pd.Series(e[1])['body']),pd.Series(e[1])['label'])for e in list(data.iterrows())]
+        #data = [(clean_text(pd.Series(e[1])['body']),pd.Series(e[1])['label'])for e in list(data.iterrows()) if not pd.Series(e[1])['body'].isnull()]
+        df = pd.DataFrame(data, columns=["body","label"])
 
         lens = pd.Series([len(e.split(" ")) for e in df['body'].values])
         df = df[lens < MAX_SENT_LEN]
@@ -164,9 +152,8 @@ def load_data(emb_type='w2v', collapse_classes=False, fold=None, num_folds=1, ra
 
         #plots the data distribution by number of words
         print("Number of entries: ", num_entries)
-        print("True/False: ",df.groupby('verdict').count())
+        print("NPOV/SPOV: ",df.groupby('label').count())
         print("Mean and Std of number of words per document: ",np.mean(lens),np.std(lens))
-        sys.exit(1)
         #sns.distplot(lens)
         #plt.show()
 
@@ -197,7 +184,11 @@ def load_data(emb_type='w2v', collapse_classes=False, fold=None, num_folds=1, ra
         #check if new linguistic features should be generated
         if not check_hash(df_hash, num_folds, stage="complexity"):
             #Generate the features ndarray and save it to a pickle
-            feat.generate_complexity()
+            try:
+                feat.generate_complexity()
+            except Exception as e:
+                print("Error on [generateFeatures.py] generateComplexity()!", e)
+                sys.exit(1)
             savehash(line=4, content=df_hash)
         if not check_hash(df_hash, num_folds, stage="specificity"):
             feat.generate_specificity()
@@ -205,7 +196,6 @@ def load_data(emb_type='w2v', collapse_classes=False, fold=None, num_folds=1, ra
         if not check_hash(df_hash, num_folds, stage="features"):
             features = []
             for idx,e in df.iterrows():
-                print("Generating Features: ",idx+1,"out of ",len(df))
                 feature = feat.vectorize(e[0],idx)
                 features.append(feature)
             features = np.array(features).astype(np.float)
@@ -231,25 +221,25 @@ def load_data(emb_type='w2v', collapse_classes=False, fold=None, num_folds=1, ra
         ############### W2V ###############
         ###################################
 
-        if not check_hash(df_hash, num_folds, stage="w2v"):
-            #generate w2v embeddings from data
-            w2v_model = w2v.KeyedVectors.load_word2vec_format(cwd+'/data/GoogleNews-vectors-negative300.bin', binary=True)
-            embeddings = []
-            for idx, row in df.iterrows():
-                words = row['body'].split(" ")
-                words = filter(lambda x: x in w2v_model.vocab, words)
-                embedding = [w2v_model.wv[word] for word in words]
-                masked = np.zeros((MAX_SENT_LEN, EMB_DIM_SIZE))
-                mask_len = min(len(embedding),MAX_SENT_LEN)
-                masked[MAX_SENT_LEN-mask_len:] = embedding[:mask_len]
-                embeddings.append(masked)
+        #if not check_hash(df_hash, num_folds, stage="w2v"):
+        #    #generate w2v embeddings from data
+        #    w2v_model = w2v.KeyedVectors.load_word2vec_format(cwd+'/data/GoogleNews-vectors-negative300.bin', binary=True)
+        #    embeddings = []
+        #    for idx, row in df.iterrows():
+        #        words = row['body'].split(" ")
+        #        words = filter(lambda x: x in w2v_model.vocab, words)
+        #        embedding = [w2v_model.wv[word] for word in words]
+        #        masked = np.zeros((MAX_SENT_LEN, EMB_DIM_SIZE))
+        #        mask_len = min(len(embedding),MAX_SENT_LEN)
+        #        masked[MAX_SENT_LEN-mask_len:] = embedding[:mask_len]
+        #        embeddings.append(masked)
 
-            embeddings = np.array(embeddings, dtype=np.float32)
-            save_p(data_dir+"/masked_embeddings", embeddings)
-            print("Masked Embeddings Saved")
-            savehash(line=6, content=df_hash)
+        #    embeddings = np.array(embeddings, dtype=np.float32)
+        #    save_p(data_dir+"/masked_embeddings", embeddings)
+        #    print("Masked Embeddings Saved")
+        #    savehash(line=6, content=df_hash)
 
-        print("MEMORY AFTER W2V: ",resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
+        #print("MEMORY AFTER W2V: ",resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
 
         #########################################
         ## CONCATENATION, SHUFFLING AND SAVING ##
@@ -262,7 +252,10 @@ def load_data(emb_type='w2v', collapse_classes=False, fold=None, num_folds=1, ra
         index_shuf = list(range(len(df)))
 
         #LABELS
-        labels = [label_to_oh[label].tolist() for label in df['verdict'].values.tolist()]
+        print(">>>>>")
+        print(">>>",df['label'].values.tolist())
+        print(label_to_oh)
+        labels = [label_to_oh[label].tolist() for label in df['label'].values.tolist()]
         labels = [labels[i] for i in index_shuf]
         label_folds = np.array_split(labels, num_folds)
         for i in range(num_folds):
