@@ -63,7 +63,7 @@ textblob==0.15.3
 tinysegmenter==0.3
 tldextract==2.2.1
 torch==1.1.0
-ujson==1.35
+ujson==5.4.0
 uncertainty==0.1.1
 urllib3==1.23
 vaderSentiment==3.2.1
