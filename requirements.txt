@@ -57,7 +57,7 @@ SPARQLWrapper==1.8.2
 tag-fixer==0.0.4
 tensorboard==1.14.0
 tensorflow-estimator==1.14.0
-tensorflow-gpu==1.14.0
+tensorflow-gpu==2.9.3
 termcolor==1.1.0
 textblob==0.15.3
 tinysegmenter==0.3
